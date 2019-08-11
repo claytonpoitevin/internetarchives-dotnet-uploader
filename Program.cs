@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Reflection;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -28,39 +26,61 @@ namespace proj
             foreach (var folder in dirs)
             {
                 UploadFolder(folder);
-                var metadataFile = $"{folder}/{METADATA_FILE_NAME}";
-                if (!File.Exists(metadataFile)) continue;
-                var metadataJson = File.ReadAllText(metadataFile);
-                var metadata = JsonConvert.DeserializeObject<Metadata>(metadataJson);
-                var filesUpload = Directory.GetFiles(folder).Select(x => Path.GetFileName(x)).Where(x => x != METADATA_FILE_NAME);
-
+                var metadata = ReadMetadata(folder);
+                if (metadata == null) continue;
                 Console.WriteLine($"Preparing upload for item with identifier '{metadata.identifier}'.");
 
                 Directory.SetCurrentDirectory(folder);
 
-                var commandline = $"upload {metadata.identifier} {string.Join(' ', filesUpload)} ";
-                foreach (var prop in metadata.GetType().GetProperties())
-                {
-                    if (prop.Name == "identifier") continue;
-                    if (prop.Name == "subject") continue;
-                    var v = prop.GetValue(metadata);
-                    commandline += $"--metadata=\"{prop.Name}:{v}\" ";
-
-                }
-                commandline += "--metadata=\"language:Portuguese\" ";
-                var psi = new ProcessStartInfo("ia", commandline);
-                var p = Process.Start(psi);
-                p.WaitForExit();
-
-                foreach (var subj in metadata.subject.Split(';'))
-                {
-                    commandline = $"metadata {metadata.identifier} --append-list=\"subject:{subj}\"";
-                    psi = new ProcessStartInfo("ia", commandline);
-                    p = Process.Start(psi);
-                    p.WaitForExit();
-                }
+                var commandline = GenerateUploadCommandLine(metadata, folder);
+                UploadItem(commandline);
+                AppendSubjectMetadata(metadata);
 
             }
+        }
+
+        static Metadata ReadMetadata(string currentFolder)
+        {
+            var metadataFile = $"{currentFolder}/{METADATA_FILE_NAME}";
+            if (!File.Exists(metadataFile)) return null;
+            var metadataJson = File.ReadAllText(metadataFile);
+            return JsonConvert.DeserializeObject<Metadata>(metadataJson);
+
+        }
+
+        static string GenerateUploadCommandLine(Metadata metadata, string currentFolder)
+        {
+            var filesUpload = Directory.GetFiles(currentFolder).Select(x => Path.GetFileName(x)).Where(x => x != METADATA_FILE_NAME);
+            var commandline = $"upload {metadata.identifier} {string.Join(' ', filesUpload)} ";
+            foreach (var prop in metadata.GetType().GetProperties())
+            {
+                if (prop.Name == "identifier") continue;
+                if (prop.Name == "subject") continue;
+                var v = prop.GetValue(metadata);
+                commandline += $"--metadata=\"{prop.Name}:{v}\" ";
+
+            }
+            commandline += "--metadata=\"language:Portuguese\" ";
+            return commandline;
+        }
+
+        static void UploadItem(string commandline)
+        {
+            var psi = new ProcessStartInfo("ia", commandline);
+            var p = Process.Start(psi);
+            p.WaitForExit();
+        }
+
+        static void AppendSubjectMetadata(Metadata metadata)
+        {
+            foreach (var subj in metadata.subject.Split(';'))
+            {
+                var commandline = $"metadata {metadata.identifier} --append-list=\"subject:{subj}\"";
+
+                var process = Process.Start(new ProcessStartInfo("ia", commandline));
+                process.WaitForExit();
+            }
+
         }
     }
 
