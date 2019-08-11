@@ -18,4 +18,4 @@ I recommend uploading to the collection 'test_collection' first to see how this 
 * Port to different platforms?
 
 Sources:
-[Internet Archive CLI]https://archive.org/services/docs/api/internetarchive/cli.html
+[Internet Archive CLI](https://archive.org/services/docs/api/internetarchive/cli.html)
